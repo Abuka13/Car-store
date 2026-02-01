@@ -1,6 +1,9 @@
 package main
 
 import (
+	"car-store/internal/handler"
+	"car-store/internal/repository"
+	"car-store/internal/service"
 	"log"
 	"net/http"
 
@@ -15,6 +18,11 @@ func main() {
 	defer db.Close()
 
 	log.Println("Connected to PostgreSQL")
+	carRepo := repository.NewCarRepository(db)
+	carService := service.NewCarService(carRepo)
+	carHandler := handler.NewCarHandler(carService)
+
+	http.HandleFunc("/cars", carHandler.CreateCar)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
