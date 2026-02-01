@@ -1,0 +1,53 @@
+package repository
+
+import (
+	"database/sql"
+
+	"car-store/internal/model"
+)
+
+type BidRepository struct {
+	db *sql.DB
+}
+
+func NewBidRepository(db *sql.DB) *BidRepository {
+	return &BidRepository{db: db}
+}
+
+func (r *BidRepository) Create(b *model.Bid) error {
+	query := `
+		INSERT INTO bids (auction_id, user_id, amount)
+		VALUES ($1, $2, $3)
+		RETURNING id, created_at
+	`
+	return r.db.QueryRow(
+		query,
+		b.AuctionID,
+		b.UserID,
+		b.Amount,
+	).Scan(&b.ID, &b.CreatedAt)
+}
+
+func (r *BidRepository) GetMaxBidByAuctionID(auctionID int64) (*model.Bid, error) {
+	query := `
+		SELECT id, auction_id, user_id, amount, created_at
+		FROM bids
+		WHERE auction_id = $1
+		ORDER BY amount DESC
+		LIMIT 1
+	`
+
+	var b model.Bid
+	err := r.db.QueryRow(query, auctionID).Scan(
+		&b.ID,
+		&b.AuctionID,
+		&b.UserID,
+		&b.Amount,
+		&b.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &b, err
+}
