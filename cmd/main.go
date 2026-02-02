@@ -25,8 +25,9 @@ func main() {
 	carHandler := handler.NewCarHandler(carService)
 
 	auctionRepo := repository.NewAuctionRepository(db)
-	auctionService := service.NewAuctionService(auctionRepo)
+    auctionService := service.NewAuctionService(auctionRepo, bidRepo)
 	auctionHandler := handler.NewAuctionHandler(auctionService)
+	auctionService.StartAuctionMonitor()
 
 	http.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
