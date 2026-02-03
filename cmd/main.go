@@ -64,6 +64,14 @@ func main() {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
 
+	http.HandleFunc("/bids", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			bidHandler.PlaceBid(w, r)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})

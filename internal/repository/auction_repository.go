@@ -86,3 +86,22 @@ func (r *AuctionRepository) Delete(id int64) error {
 	_, err := r.db.Exec(`DELETE FROM auctions WHERE id = $1`, id)
 	return err
 }
+
+func (r *AuctionRepository) GetByID(id int64) (*model.Auction, error) {
+	query := `
+		SELECT id, car_id, start_price, start_time, end_time, created_at
+		FROM auctions
+		WHERE id = $1
+	`
+	var a model.Auction
+	err := r.db.QueryRow(query, id).Scan(
+		&a.ID, &a.CarID, &a.StartPrice, &a.StartTime, &a.EndTime, &a.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
