@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -25,12 +26,22 @@ func (h *AuctionHandler) CreateAuction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.CreateAuction(&a); err != nil {
+		if errors.Is(err, service.ErrCarNotFound) {
+			http.Error(w, err.Error(), http.StatusBadRequest) // 400
+			return
+		}
+
+		if errors.Is(err, service.ErrCarAlreadyOnAuction) {
+			http.Error(w, err.Error(), http.StatusConflict) // 409
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(a)
+	_ = json.NewEncoder(w).Encode(a)
 }
 
 func (h *AuctionHandler) GetAuctions(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +50,7 @@ func (h *AuctionHandler) GetAuctions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(auctions)
+	_ = json.NewEncoder(w).Encode(auctions)
 }
 
 func (h *AuctionHandler) UpdateAuction(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -9,12 +10,24 @@ import (
 	"car-store/internal/model"
 )
 
+var (
+	ErrCarAlreadyOnAuction = errors.New("car already on auction")
+	ErrCarNotFound         = errors.New("car not found")
+)
+
+/* ===== INTERFACES ===== */
+
 type AuctionRepo interface {
 	Create(a *model.Auction) error
 	GetAll() ([]model.Auction, error)
 	Update(a *model.Auction) error
 	Delete(id int64) error
 	GetByID(id int64) (*model.Auction, error)
+	ExistsByCarID(carID int64) (bool, error)
+}
+
+type CarRepo interface {
+	ExistsByID(id int64) (bool, error)
 }
 
 type BidRepo interface {
@@ -23,24 +36,50 @@ type BidRepo interface {
 	UserBidsLimitInMinute(userID, auctionID int64) (int, error)
 }
 
+/* ===== SERVICE ===== */
+
 type AuctionService struct {
 	repo    AuctionRepo
+	carRepo CarRepo
 	bidRepo BidRepo
 
-	// in-memory finished auctions (compromise solution)
 	finished map[int64]bool
 	mu       sync.Mutex
 }
 
-func NewAuctionService(repo AuctionRepo, bidRepo BidRepo) *AuctionService {
+func NewAuctionService(
+	repo AuctionRepo,
+	carRepo CarRepo,
+	bidRepo BidRepo,
+) *AuctionService {
 	return &AuctionService{
 		repo:     repo,
+		carRepo:  carRepo,
 		bidRepo:  bidRepo,
 		finished: make(map[int64]bool),
 	}
 }
 
 func (s *AuctionService) CreateAuction(a *model.Auction) error {
+	// 1️⃣ проверяем, что машина существует
+	exists, err := s.carRepo.ExistsByID(a.CarID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrCarNotFound
+	}
+
+	// 2️⃣ проверяем, что машина не в аукционе
+	used, err := s.repo.ExistsByCarID(a.CarID)
+	if err != nil {
+		return err
+	}
+	if used {
+		return ErrCarAlreadyOnAuction
+	}
+
+	// 3️⃣ создаём аукцион
 	return s.repo.Create(a)
 }
 
@@ -98,7 +137,6 @@ func (s *AuctionService) CheckAuctionsEvery5Sec() {
 	now := time.Now()
 
 	for _, a := range auctions {
-
 		s.mu.Lock()
 		if s.finished[a.ID] {
 			s.mu.Unlock()
@@ -111,9 +149,9 @@ func (s *AuctionService) CheckAuctionsEvery5Sec() {
 		if maxBid != nil && maxBid.Amount > price {
 			price = maxBid.Amount
 		}
+
 		log.Printf("Auction %d current price: %.2f\n", a.ID, price)
 
-		// финализация
 		if a.EndTime.Before(now) {
 			s.finalizeOnce(a)
 		}

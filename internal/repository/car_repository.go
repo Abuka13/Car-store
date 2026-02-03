@@ -31,3 +31,13 @@ func (r *CarRepository) Create(car *model.Car) error {
 		car.IsAuctionOnly,
 	).Scan(&car.ID, &car.CreatedAt)
 }
+
+func (r *CarRepository) ExistsByID(id int64) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(
+		"SELECT EXISTS (SELECT 1 FROM cars WHERE id = $1)",
+		id,
+	).Scan(&exists)
+
+	return exists, err
+}

@@ -14,7 +14,6 @@ func NewAuctionRepository(db *sql.DB) *AuctionRepository {
 	return &AuctionRepository{db: db}
 }
 
-// CREATE
 func (r *AuctionRepository) Create(a *model.Auction) error {
 	query := `
 		INSERT INTO auctions (car_id, start_price, start_time, end_time)
@@ -31,7 +30,6 @@ func (r *AuctionRepository) Create(a *model.Auction) error {
 	).Scan(&a.ID, &a.CreatedAt)
 }
 
-// READ (ALL)
 func (r *AuctionRepository) GetAll() ([]model.Auction, error) {
 	rows, err := r.db.Query(`
 		SELECT id, car_id, start_price, start_time, end_time, created_at
@@ -60,7 +58,6 @@ func (r *AuctionRepository) GetAll() ([]model.Auction, error) {
 	return auctions, nil
 }
 
-// UPDATE
 func (r *AuctionRepository) Update(a *model.Auction) error {
 	query := `
 		UPDATE auctions
@@ -81,7 +78,6 @@ func (r *AuctionRepository) Update(a *model.Auction) error {
 	return err
 }
 
-// DELETE
 func (r *AuctionRepository) Delete(id int64) error {
 	_, err := r.db.Exec(`DELETE FROM auctions WHERE id = $1`, id)
 	return err
@@ -104,4 +100,14 @@ func (r *AuctionRepository) GetByID(id int64) (*model.Auction, error) {
 		return nil, err
 	}
 	return &a, nil
+}
+
+func (r *AuctionRepository) ExistsByCarID(carID int64) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(
+		"SELECT EXISTS (SELECT 1 FROM auctions WHERE car_id = $1)",
+		carID,
+	).Scan(&exists)
+
+	return exists, err
 }

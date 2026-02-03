@@ -7,13 +7,11 @@ import (
 
 	"car-store/internal/config"
 	"car-store/internal/handler"
-
 	"car-store/internal/repository"
 	"car-store/internal/service"
 )
 
 func main() {
-
 	db, err := config.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
@@ -22,17 +20,25 @@ func main() {
 
 	log.Println("Connected to PostgreSQL")
 
+	// repositories
 	carRepo := repository.NewCarRepository(db)
 	auctionRepo := repository.NewAuctionRepository(db)
 	bidRepo := repository.NewBidRepository(db)
 
+	// services
 	carService := service.NewCarService(carRepo)
-	auctionService := service.NewAuctionService(auctionRepo, bidRepo)
+	auctionService := service.NewAuctionService(
+		auctionRepo, // AuctionRepo
+		carRepo,     // CarRepo 👈 ВАЖНО
+		bidRepo,     // BidRepo
+	)
 
+	// handlers
 	carHandler := handler.NewCarHandler(carService)
 	auctionHandler := handler.NewAuctionHandler(auctionService)
 	bidHandler := handler.NewBidHandler(auctionService)
 
+	// routes
 	http.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			carHandler.CreateCar(w, r)

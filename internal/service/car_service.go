@@ -2,21 +2,19 @@ package service
 
 import "car-store/internal/model"
 
-type CarRepo interface {
+// 👇 ОТДЕЛЬНЫЙ интерфейс ТОЛЬКО для CarService
+type CarRepository interface {
 	Create(car *model.Car) error
 }
 
 type CarService struct {
-	repo CarRepo
+	repo CarRepository
 }
 
-func NewCarService(repo CarRepo) *CarService {
+func NewCarService(repo CarRepository) *CarService {
 	return &CarService{repo: repo}
 }
 
 func (s *CarService) CreateCar(car *model.Car) error {
-	if car.Status == "" {
-		car.Status = "available"
-	}
 	return s.repo.Create(car)
 }
