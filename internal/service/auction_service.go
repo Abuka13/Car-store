@@ -10,12 +10,12 @@ import (
 	"car-store/internal/model"
 )
 
+var ErrAuctionFinished = errors.New("auction is finished")
+
 var (
 	ErrCarAlreadyOnAuction = errors.New("car already on auction")
 	ErrCarNotFound         = errors.New("car not found")
 )
-
-/* ===== INTERFACES ===== */
 
 type AuctionRepo interface {
 	Create(a *model.Auction) error
@@ -35,8 +35,6 @@ type BidRepo interface {
 	GetMaxBidByAuctionID(auctionID int64) (*model.Bid, error)
 	UserBidsLimitInMinute(userID, auctionID int64) (int, error)
 }
-
-/* ===== SERVICE ===== */
 
 type AuctionService struct {
 	repo    AuctionRepo
@@ -61,7 +59,7 @@ func NewAuctionService(
 }
 
 func (s *AuctionService) CreateAuction(a *model.Auction) error {
-	// 1️⃣ проверяем, что машина существует
+
 	exists, err := s.carRepo.ExistsByID(a.CarID)
 	if err != nil {
 		return err
@@ -70,7 +68,6 @@ func (s *AuctionService) CreateAuction(a *model.Auction) error {
 		return ErrCarNotFound
 	}
 
-	// 2️⃣ проверяем, что машина не в аукционе
 	used, err := s.repo.ExistsByCarID(a.CarID)
 	if err != nil {
 		return err
@@ -79,7 +76,6 @@ func (s *AuctionService) CreateAuction(a *model.Auction) error {
 		return ErrCarAlreadyOnAuction
 	}
 
-	// 3️⃣ создаём аукцион
 	return s.repo.Create(a)
 }
 
@@ -96,6 +92,19 @@ func (s *AuctionService) DeleteAuction(id int64) error {
 }
 
 func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error {
+
+	auction, err := s.repo.GetByID(auctionID)
+	if err != nil {
+		return err
+	}
+	if auction == nil {
+		return errors.New("auction not found")
+	}
+
+	if time.Now().After(auction.EndTime) {
+		return ErrAuctionFinished
+	}
+
 	count, err := s.bidRepo.UserBidsLimitInMinute(userID, auctionID)
 	if err != nil {
 		return err

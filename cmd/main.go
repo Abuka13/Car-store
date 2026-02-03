@@ -20,10 +20,10 @@ func main() {
 
 	log.Println("Connected to PostgreSQL")
 
-	// repositories
 	carRepo := repository.NewCarRepository(db)
 	auctionRepo := repository.NewAuctionRepository(db)
 	bidRepo := repository.NewBidRepository(db)
+	userRepo := repository.NewUserRepository(db)
 
 	// services
 	carService := service.NewCarService(carRepo)
@@ -32,12 +32,21 @@ func main() {
 		carRepo,     // CarRepo 👈 ВАЖНО
 		bidRepo,     // BidRepo
 	)
+	userService := service.NewUserService(userRepo)
 
 	// handlers
 	carHandler := handler.NewCarHandler(carService)
 	auctionHandler := handler.NewAuctionHandler(auctionService)
 	bidHandler := handler.NewBidHandler(auctionService)
+	userHandler := handler.NewUserHandler(userService)
 
+	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			userHandler.CreateUser(w, r)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
 	// routes
 	http.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
