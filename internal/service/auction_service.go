@@ -14,11 +14,13 @@ type AuctionRepo interface {
 	GetAll() ([]model.Auction, error)
 	Update(a *model.Auction) error
 	Delete(id int64) error
+	GetByID(id int64) (*model.Auction, error)
 }
 
 type BidRepo interface {
 	Create(b *model.Bid) error
 	GetMaxBidByAuctionID(auctionID int64) (*model.Bid, error)
+	UserBidsLimitInMinute(userID, auctionID int64) (int, error)
 }
 
 type AuctionService struct {
@@ -55,6 +57,14 @@ func (s *AuctionService) DeleteAuction(id int64) error {
 }
 
 func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error {
+	count, err := s.bidRepo.UserBidsLimitInMinute(userID, auctionID)
+	if err != nil {
+		return err
+	}
+	if count >= 3 {
+		return fmt.Errorf("bid limit exceeded: max 3 bids per minute")
+	}
+
 	maxBid, err := s.bidRepo.GetMaxBidByAuctionID(auctionID)
 	if err != nil {
 		return err
@@ -98,10 +108,9 @@ func (s *AuctionService) CheckAuctionsEvery5Sec() {
 
 		maxBid, _ := s.bidRepo.GetMaxBidByAuctionID(a.ID)
 		price := a.StartPrice
-		if maxBid != nil {
+		if maxBid != nil && maxBid.Amount > price {
 			price = maxBid.Amount
 		}
-
 		log.Printf("Auction %d current price: %.2f\n", a.ID, price)
 
 		// финализация

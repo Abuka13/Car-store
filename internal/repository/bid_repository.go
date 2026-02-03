@@ -51,3 +51,16 @@ func (r *BidRepository) GetMaxBidByAuctionID(auctionID int64) (*model.Bid, error
 	}
 	return &b, err
 }
+
+func (r *BidRepository) UserBidsLimitInMinute(userID, auctionID int64) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM bids
+		WHERE user_id = $1
+		  AND auction_id = $2
+		  AND created_at >= NOW() - INTERVAL '1 minute'
+	`
+	var count int
+	err := r.db.QueryRow(query, userID, auctionID).Scan(&count)
+	return count, err
+}

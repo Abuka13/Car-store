@@ -15,7 +15,7 @@ CREATE TABLE cars (
                       year INT NOT NULL,
                       price NUMERIC,
                       status TEXT NOT NULL DEFAULT 'available',
-                      is_auction_only BOOLEAN DEFAULT FALSE,
+                      i s_auction_only BOOLEAN DEFAULT FALSE,
                       created_at TIMESTAMP DEFAULT NOW()
 );
 
