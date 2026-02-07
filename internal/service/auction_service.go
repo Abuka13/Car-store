@@ -26,7 +26,7 @@ type AuctionRepo interface {
 	ExistsByCarID(carID int64) (bool, error)
 }
 
-type CarRepo interface {
+type CarExistenceRepo interface {
 	ExistsByID(id int64) (bool, error)
 }
 
@@ -38,7 +38,7 @@ type BidRepo interface {
 
 type AuctionService struct {
 	repo    AuctionRepo
-	carRepo CarRepo
+	carRepo CarExistenceRepo
 	bidRepo BidRepo
 
 	finished map[int64]bool
@@ -47,7 +47,7 @@ type AuctionService struct {
 
 func NewAuctionService(
 	repo AuctionRepo,
-	carRepo CarRepo,
+	carRepo CarExistenceRepo,
 	bidRepo BidRepo,
 ) *AuctionService {
 	return &AuctionService{
