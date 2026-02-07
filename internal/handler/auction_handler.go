@@ -45,11 +45,38 @@ func (h *AuctionHandler) CreateAuction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuctionHandler) GetAuctions(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+
+	// 👉 GET /auctions?id=123
+	if idStr != "" {
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid auction id", http.StatusBadRequest)
+			return
+		}
+
+		auction, err := h.service.GetAuctionByID(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if auction == nil {
+			http.Error(w, "auction not found", http.StatusNotFound)
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode(auction)
+		return
+	}
+
+	// 👉 GET /auctions (all)
 	auctions, err := h.service.GetAuctions()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	_ = json.NewEncoder(w).Encode(auctions)
 }
 

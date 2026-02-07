@@ -11,8 +11,8 @@ func ConnectDB() (*sql.DB, error) {
 	host := "localhost"
 	port := 5432
 	user := "postgres"
-	password := "123456"
-	dbname := "car-store"
+	password := "Takanashi_13"
+	dbname := "car_store"
 
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",

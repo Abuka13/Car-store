@@ -90,6 +90,9 @@ func (s *AuctionService) UpdateAuction(a *model.Auction) error {
 func (s *AuctionService) DeleteAuction(id int64) error {
 	return s.repo.Delete(id)
 }
+func (s *AuctionService) GetAuctionByID(id int64) (*model.Auction, error) {
+	return s.repo.GetByID(id)
+}
 
 func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error {
 

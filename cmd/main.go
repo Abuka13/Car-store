@@ -7,11 +7,15 @@ import (
 
 	"car-store/internal/config"
 	"car-store/internal/handler"
+	"car-store/internal/middleware"
 	"car-store/internal/repository"
 	"car-store/internal/service"
 )
 
 func main() {
+	// --------------------
+	// DB
+	// --------------------
 	db, err := config.ConnectDB()
 	if err != nil {
 		log.Fatal(err)
@@ -20,34 +24,41 @@ func main() {
 
 	log.Println("Connected to PostgreSQL")
 
+	// --------------------
+	// REPOSITORIES
+	// --------------------
 	carRepo := repository.NewCarRepository(db)
 	auctionRepo := repository.NewAuctionRepository(db)
 	bidRepo := repository.NewBidRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
-	// services
+	// --------------------
+	// SERVICES
+	// --------------------
 	carService := service.NewCarService(carRepo)
+
 	auctionService := service.NewAuctionService(
 		auctionRepo, // AuctionRepo
-		carRepo,     // CarRepo 👈 ВАЖНО
+		carRepo,     // CarRepo (для проверки машины)
 		bidRepo,     // BidRepo
 	)
-	userService := service.NewUserService(userRepo)
 
-	// handlers
+	authService := service.NewAuthService(userRepo)
+
+	// --------------------
+	// HANDLERS
+	// --------------------
 	carHandler := handler.NewCarHandler(carService)
 	auctionHandler := handler.NewAuctionHandler(auctionService)
 	bidHandler := handler.NewBidHandler(auctionService)
-	userHandler := handler.NewUserHandler(userService)
+	authHandler := handler.NewAuthHandler(authService)
 
-	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			userHandler.CreateUser(w, r)
-			return
-		}
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	})
-	// routes
+	// --------------------
+	// AUTH ROUTES
+	// --------------------
+	http.HandleFunc("/auth/register", authHandler.Register)
+	http.HandleFunc("/auth/login", authHandler.Login)
+
 	http.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			carHandler.CreateCar(w, r)
@@ -71,25 +82,10 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/auctions/bid", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			bidHandler.PlaceBid(w, r)
-			return
-		}
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	})
-
-	http.HandleFunc("/bids", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			bidHandler.PlaceBid(w, r)
-			return
-		}
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	})
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
-	})
+	http.HandleFunc(
+		"/auctions/bid",
+		middleware.Auth(bidHandler.PlaceBid),
+	)
 
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
