@@ -60,11 +60,28 @@ func main() {
 	http.HandleFunc("/auth/login", authHandler.Login)
 
 	http.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			carHandler.CreateCar(w, r)
-			return
+		switch r.Method {
+		case http.MethodGet:
+			carHandler.GetCars(w, r)
+
+		case http.MethodPost:
+			middleware.Auth(
+				middleware.AdminOnly(carHandler.CreateCar),
+			)(w, r)
+
+		case http.MethodPut:
+			middleware.Auth(
+				middleware.AdminOnly(carHandler.UpdateCar),
+			)(w, r)
+
+		case http.MethodDelete:
+			middleware.Auth(
+				middleware.AdminOnly(carHandler.DeleteCar),
+			)(w, r)
+
+		default:
+			http.Error(w, "method not allowed", 405)
 		}
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
 
 	http.HandleFunc("/auctions", func(w http.ResponseWriter, r *http.Request) {
