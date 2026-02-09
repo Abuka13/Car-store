@@ -1,6 +1,6 @@
 # Car-store
 
-Car-store is a monolithic web application written in Go (Golang), developed as part of the Advanced Programming (AP1) course.
+Car-store is a monolithic web application written in Go (Golang), developed as part of the Advanced Programming (AP1) course
 
 The project implements a backend service for a car marketplace. It includes basic car management and an auction system, demonstrating server-side application architecture, database interaction, and REST-style API design.
 
