@@ -67,6 +67,39 @@ func (s *OrderService) BuyDirect(userID, carID int64) error {
 	return s.carRepo.Update(car)
 }
 
+func (s *OrderService) CreateFromAuction(
+	userID, carID int64,
+	price float64,
+) error {
+
+	sold, err := s.orderRepo.ExistsByCarID(carID)
+	if err != nil {
+		return err
+	}
+	if sold {
+		return ErrCarAlreadySold
+	}
+
+	order := &model.Order{
+		UserID:     userID,
+		CarID:      carID,
+		TotalPrice: price,
+		Source:     "auction",
+	}
+
+	if err := s.orderRepo.Create(order); err != nil {
+		return err
+	}
+
+	car, err := s.carRepo.GetByID(carID)
+	if err != nil {
+		return err
+	}
+
+	car.Status = "sold"
+	return s.carRepo.Update(car)
+}
+
 func (s *OrderService) GetMyOrders(userID int64) ([]model.Order, error) {
 	return s.orderRepo.GetByUser(userID)
 }

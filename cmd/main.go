@@ -31,56 +31,25 @@ func main() {
 	auctionRepo := repository.NewAuctionRepository(db)
 	bidRepo := repository.NewBidRepository(db)
 	userRepo := repository.NewUserRepository(db)
+	orderRepo := repository.NewOrderRepository(db)
+	favoriteRepo := repository.NewFavoriteRepository(db)
 
 	// --------------------
 	// SERVICES
 	// --------------------
 	carService := service.NewCarService(carRepo)
 
+	orderService := service.NewOrderService(orderRepo, carRepo)
+
 	auctionService := service.NewAuctionService(
-		auctionRepo, // AuctionRepo
-		carRepo,     // CarRepo (для проверки машины)
-		bidRepo,     // BidRepo
+		auctionRepo,
+		carRepo,
+		bidRepo,
+		orderService,
 	)
 
 	authService := service.NewAuthService(userRepo)
-
-	// favorites
-
-	favoriteRepo := repository.NewFavoriteRepository(db)
 	favoriteService := service.NewFavoriteService(favoriteRepo)
-	favoriteHandler := handler.NewFavoriteHandler(favoriteService)
-
-	http.HandleFunc(
-		"/favorites",
-		middleware.Auth(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-			case http.MethodGet:
-				favoriteHandler.GetMy(w, r)
-			case http.MethodPost:
-				favoriteHandler.Add(w, r)
-			case http.MethodDelete:
-				favoriteHandler.Remove(w, r)
-			default:
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			}
-		}),
-	)
-
-	//Order
-	orderRepo := repository.NewOrderRepository(db)
-	orderService := service.NewOrderService(orderRepo, carRepo)
-	orderHandler := handler.NewOrderHandler(orderService)
-
-	http.HandleFunc(
-		"/orders/buy",
-		middleware.Auth(orderHandler.Buy),
-	)
-
-	http.HandleFunc(
-		"/orders/my",
-		middleware.Auth(orderHandler.GetMy),
-	)
 
 	// --------------------
 	// HANDLERS
@@ -89,17 +58,23 @@ func main() {
 	auctionHandler := handler.NewAuctionHandler(auctionService)
 	bidHandler := handler.NewBidHandler(auctionService)
 	authHandler := handler.NewAuthHandler(authService)
+	orderHandler := handler.NewOrderHandler(orderService)
+	favoriteHandler := handler.NewFavoriteHandler(favoriteService)
 
 	// --------------------
-	// AUTH ROUTES
+	// AUTH (PUBLIC)
 	// --------------------
 	http.HandleFunc("/auth/register", authHandler.Register)
 	http.HandleFunc("/auth/login", authHandler.Login)
 
+	// --------------------
+	// CARS
+	// --------------------
 	http.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
+
 		case http.MethodGet:
-			carHandler.GetCars(w, r)
+			middleware.Auth(carHandler.GetCars)(w, r)
 
 		case http.MethodPost:
 			middleware.Auth(
@@ -117,37 +92,94 @@ func main() {
 			)(w, r)
 
 		default:
-			http.Error(w, "method not allowed", 405)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
+	// --------------------
+	// AUCTIONS
+	// --------------------
 	http.HandleFunc("/auctions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
-		case http.MethodPost:
-			auctionHandler.CreateAuction(w, r)
+
 		case http.MethodGet:
-			auctionHandler.GetAuctions(w, r)
+			middleware.Auth(auctionHandler.GetAuctions)(w, r)
+
+		case http.MethodPost:
+			middleware.Auth(
+				middleware.AdminOnly(auctionHandler.CreateAuction),
+			)(w, r)
+
 		case http.MethodPut:
-			auctionHandler.UpdateAuction(w, r)
+			middleware.Auth(
+				middleware.AdminOnly(auctionHandler.UpdateAuction),
+			)(w, r)
+
 		case http.MethodDelete:
-			auctionHandler.DeleteAuction(w, r)
+			middleware.Auth(
+				middleware.AdminOnly(auctionHandler.DeleteAuction),
+			)(w, r)
+
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
+	// --------------------
+	// BIDS
+	// --------------------
 	http.HandleFunc(
 		"/auctions/bid",
 		middleware.Auth(bidHandler.PlaceBid),
 	)
 
+	// --------------------
+	// FAVORITES
+	// --------------------
+	http.HandleFunc(
+		"/favorites",
+		middleware.Auth(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet:
+				favoriteHandler.GetMy(w, r)
+			case http.MethodPost:
+				favoriteHandler.Add(w, r)
+			case http.MethodDelete:
+				favoriteHandler.Remove(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+		}),
+	)
+
+	// --------------------
+	// ORDERS
+	// --------------------
+	http.HandleFunc(
+		"/orders/buy",
+		middleware.Auth(orderHandler.Buy),
+	)
+
+	http.HandleFunc(
+		"/orders/my",
+		middleware.Auth(orderHandler.GetMy),
+	)
+
+	// --------------------
+	// BACKGROUND WORKER
+	// --------------------
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
 		for range ticker.C {
 			auctionService.CheckAuctionsEvery5Sec()
 		}
 	}()
 
+	// --------------------
+	// START SERVER
+	// --------------------
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
