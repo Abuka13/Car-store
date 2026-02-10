@@ -41,12 +41,23 @@ CREATE TABLE bids (
 -- ORDERS
 CREATE TABLE orders (
                         id BIGSERIAL PRIMARY KEY,
-                        user_id BIGINT NOT NULL REFERENCES users(id),
-                        car_id BIGINT NOT NULL REFERENCES cars(id),
+                        user_id BIGINT NOT NULL,
+                        car_id BIGINT NOT NULL UNIQUE,
                         total_price NUMERIC NOT NULL,
-                        source TEXT NOT NULL, -- 'auction' or 'direct'
-                        created_at TIMESTAMP DEFAULT NOW()
+                        source TEXT NOT NULL CHECK (source IN ('auction', 'direct')),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                        CONSTRAINT fk_orders_user
+                            FOREIGN KEY (user_id)
+                                REFERENCES users(id)
+                                ON DELETE CASCADE,
+
+                        CONSTRAINT fk_orders_car
+                            FOREIGN KEY (car_id)
+                                REFERENCES cars(id)
+                                ON DELETE CASCADE
 );
+
 
 CREATE TABLE favorites (
                            user_id BIGINT NOT NULL,
@@ -65,4 +76,5 @@ CREATE TABLE favorites (
                                    REFERENCES cars(id)
                                    ON DELETE CASCADE
 );
+
 

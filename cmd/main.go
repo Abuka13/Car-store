@@ -67,6 +67,21 @@ func main() {
 		}),
 	)
 
+	//Order
+	orderRepo := repository.NewOrderRepository(db)
+	orderService := service.NewOrderService(orderRepo, carRepo)
+	orderHandler := handler.NewOrderHandler(orderService)
+
+	http.HandleFunc(
+		"/orders/buy",
+		middleware.Auth(orderHandler.Buy),
+	)
+
+	http.HandleFunc(
+		"/orders/my",
+		middleware.Auth(orderHandler.GetMy),
+	)
+
 	// --------------------
 	// HANDLERS
 	// --------------------
