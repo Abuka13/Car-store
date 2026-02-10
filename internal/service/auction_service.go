@@ -17,6 +17,8 @@ var (
 	ErrCarNotFound         = errors.New("car not found")
 )
 
+// ---------- REPO INTERFACES ----------
+
 type AuctionRepo interface {
 	Create(a *model.Auction) error
 	GetAll() ([]model.Auction, error)
@@ -36,10 +38,17 @@ type BidRepo interface {
 	UserBidsLimitInMinute(userID, auctionID int64) (int, error)
 }
 
+type OrderCreator interface {
+	CreateFromAuction(userID, carID int64, price float64) error
+}
+
+// ---------- SERVICE ----------
+
 type AuctionService struct {
-	repo    AuctionRepo
-	carRepo CarExistenceRepo
-	bidRepo BidRepo
+	repo     AuctionRepo
+	carRepo  CarExistenceRepo
+	bidRepo  BidRepo
+	orderSvc OrderCreator
 
 	finished map[int64]bool
 	mu       sync.Mutex
@@ -49,17 +58,21 @@ func NewAuctionService(
 	repo AuctionRepo,
 	carRepo CarExistenceRepo,
 	bidRepo BidRepo,
+	orderSvc OrderCreator,
 ) *AuctionService {
 	return &AuctionService{
 		repo:     repo,
 		carRepo:  carRepo,
 		bidRepo:  bidRepo,
+		orderSvc: orderSvc,
 		finished: make(map[int64]bool),
 	}
 }
 
-func (s *AuctionService) CreateAuction(a *model.Auction) error {
+// ---------- CRUD AUCTIONS ----------
 
+func (s *AuctionService) CreateAuction(a *model.Auction) error {
+	// проверяем, что машина существует
 	exists, err := s.carRepo.ExistsByID(a.CarID)
 	if err != nil {
 		return err
@@ -68,6 +81,7 @@ func (s *AuctionService) CreateAuction(a *model.Auction) error {
 		return ErrCarNotFound
 	}
 
+	// проверяем, что машина ещё не участвует в другом аукционе
 	used, err := s.repo.ExistsByCarID(a.CarID)
 	if err != nil {
 		return err
@@ -83,6 +97,10 @@ func (s *AuctionService) GetAuctions() ([]model.Auction, error) {
 	return s.repo.GetAll()
 }
 
+func (s *AuctionService) GetAuctionByID(id int64) (*model.Auction, error) {
+	return s.repo.GetByID(id)
+}
+
 func (s *AuctionService) UpdateAuction(a *model.Auction) error {
 	return s.repo.Update(a)
 }
@@ -90,12 +108,10 @@ func (s *AuctionService) UpdateAuction(a *model.Auction) error {
 func (s *AuctionService) DeleteAuction(id int64) error {
 	return s.repo.Delete(id)
 }
-func (s *AuctionService) GetAuctionByID(id int64) (*model.Auction, error) {
-	return s.repo.GetByID(id)
-}
+
+// ---------- BIDS ----------
 
 func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error {
-
 	auction, err := s.repo.GetByID(auctionID)
 	if err != nil {
 		return err
@@ -104,10 +120,12 @@ func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error
 		return errors.New("auction not found")
 	}
 
+	// нельзя ставить после окончания
 	if time.Now().After(auction.EndTime) {
 		return ErrAuctionFinished
 	}
 
+	// лимит 3 ставки в минуту
 	count, err := s.bidRepo.UserBidsLimitInMinute(userID, auctionID)
 	if err != nil {
 		return err
@@ -116,6 +134,7 @@ func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error
 		return fmt.Errorf("bid limit exceeded: max 3 bids per minute")
 	}
 
+	// проверяем текущую цену
 	maxBid, err := s.bidRepo.GetMaxBidByAuctionID(auctionID)
 	if err != nil {
 		return err
@@ -125,7 +144,6 @@ func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error
 	if maxBid != nil {
 		currentPrice = maxBid.Amount
 	}
-
 	if amount <= currentPrice {
 		return fmt.Errorf("bid must be higher than current price")
 	}
@@ -139,6 +157,8 @@ func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error
 	return s.bidRepo.Create(bid)
 }
 
+// ---------- BACKGROUND CHECKER ----------
+
 func (s *AuctionService) CheckAuctionsEvery5Sec() {
 	auctions, err := s.repo.GetAll()
 	if err != nil {
@@ -149,6 +169,7 @@ func (s *AuctionService) CheckAuctionsEvery5Sec() {
 	now := time.Now()
 
 	for _, a := range auctions {
+		// быстро проверяем, что аукцион уже финализирован
 		s.mu.Lock()
 		if s.finished[a.ID] {
 			s.mu.Unlock()
@@ -162,21 +183,29 @@ func (s *AuctionService) CheckAuctionsEvery5Sec() {
 			price = maxBid.Amount
 		}
 
-		log.Printf("Auction %d current price: %.2f\n", a.ID, price)
-
-		if a.EndTime.Before(now) {
+		// если ещё идёт — просто показываем текущую цену
+		if a.EndTime.After(now) {
+			log.Printf("Auction %d current price: %.2f\n", a.ID, price)
+		} else {
+			// если закончился — финализируем
 			s.finalizeOnce(a)
 		}
 	}
 }
 
-func (s *AuctionService) finalizeOnce(a model.Auction) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// ---------- FINALIZE AUCTION ONCE ----------
 
+func (s *AuctionService) finalizeOnce(a model.Auction) {
+	// коротко лочим только доступ к map
+	s.mu.Lock()
 	if s.finished[a.ID] {
+		s.mu.Unlock()
 		return
 	}
+	// помечаем аукцион завершённым СРАЗУ,
+	// чтобы даже при ошибке order он больше не повторялся
+	s.finished[a.ID] = true
+	s.mu.Unlock()
 
 	maxBid, err := s.bidRepo.GetMaxBidByAuctionID(a.ID)
 	if err != nil {
@@ -191,9 +220,16 @@ func (s *AuctionService) finalizeOnce(a model.Auction) {
 			maxBid.UserID,
 			maxBid.Amount,
 		)
+
+		// создаём order из аукциона
+		if err := s.orderSvc.CreateFromAuction(
+			maxBid.UserID,
+			a.CarID,
+			maxBid.Amount,
+		); err != nil {
+			log.Println("error creating order from auction:", err)
+		}
 	} else {
 		log.Printf("Auction %d FINISHED with no bids\n", a.ID)
 	}
-
-	s.finished[a.ID] = true
 }
