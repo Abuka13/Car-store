@@ -45,6 +45,28 @@ func main() {
 
 	authService := service.NewAuthService(userRepo)
 
+	// favorites
+
+	favoriteRepo := repository.NewFavoriteRepository(db)
+	favoriteService := service.NewFavoriteService(favoriteRepo)
+	favoriteHandler := handler.NewFavoriteHandler(favoriteService)
+
+	http.HandleFunc(
+		"/favorites",
+		middleware.Auth(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet:
+				favoriteHandler.GetMy(w, r)
+			case http.MethodPost:
+				favoriteHandler.Add(w, r)
+			case http.MethodDelete:
+				favoriteHandler.Remove(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+		}),
+	)
+
 	// --------------------
 	// HANDLERS
 	// --------------------

@@ -47,3 +47,22 @@ CREATE TABLE orders (
                         source TEXT NOT NULL, -- 'auction' or 'direct'
                         created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE TABLE favorites (
+                           user_id BIGINT NOT NULL,
+                           car_id  BIGINT NOT NULL,
+                           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                           CONSTRAINT pk_favorites PRIMARY KEY (user_id, car_id),
+
+                           CONSTRAINT fk_favorites_user
+                               FOREIGN KEY (user_id)
+                                   REFERENCES users(id)
+                                   ON DELETE CASCADE,
+
+                           CONSTRAINT fk_favorites_car
+                               FOREIGN KEY (car_id)
+                                   REFERENCES cars(id)
+                                   ON DELETE CASCADE
+);
+
