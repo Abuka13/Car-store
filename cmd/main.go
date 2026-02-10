@@ -38,9 +38,9 @@ func main() {
 	carService := service.NewCarService(carRepo)
 
 	auctionService := service.NewAuctionService(
-		auctionRepo, // AuctionRepo
-		carRepo,     // CarRepo (для проверки машины)
-		bidRepo,     // BidRepo
+		auctionRepo,
+		carRepo,
+		bidRepo,
 	)
 
 	authService := service.NewAuthService(userRepo)
@@ -54,12 +54,20 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 
 	// --------------------
-	// AUTH ROUTES
+	// ROUTES
 	// --------------------
-	http.HandleFunc("/auth/register", authHandler.Register)
-	http.HandleFunc("/auth/login", authHandler.Login)
+	mux := http.NewServeMux()
 
-	http.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
+	// AUTH
+	mux.HandleFunc("/auth/register", authHandler.Register)
+	mux.HandleFunc("/auth/login", authHandler.Login)
+	mux.Handle(
+		"/auth/me",
+		middleware.Auth(http.HandlerFunc(authHandler.Me)),
+	)
+
+	// CARS
+	mux.HandleFunc("/cars", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			carHandler.GetCars(w, r)
@@ -80,11 +88,12 @@ func main() {
 			)(w, r)
 
 		default:
-			http.Error(w, "method not allowed", 405)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
-	http.HandleFunc("/auctions", func(w http.ResponseWriter, r *http.Request) {
+	// AUCTIONS
+	mux.HandleFunc("/auctions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
 			auctionHandler.CreateAuction(w, r)
@@ -99,11 +108,15 @@ func main() {
 		}
 	})
 
-	http.HandleFunc(
+	// BIDS
+	mux.Handle(
 		"/auctions/bid",
-		middleware.Auth(bidHandler.PlaceBid),
+		middleware.Auth(http.HandlerFunc(bidHandler.PlaceBid)),
 	)
 
+	// --------------------
+	// BACKGROUND AUCTION CHECK
+	// --------------------
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
@@ -111,6 +124,12 @@ func main() {
 		}
 	}()
 
+	// --------------------
+	// START SERVER (🔥 CORS HERE 🔥)
+	// --------------------
+	handlerWithCORS := middleware.CORS(mux)
+
 	log.Println("Server started on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", handlerWithCORS))
+
 }

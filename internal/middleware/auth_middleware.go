@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -15,6 +16,7 @@ type ctxKey string
 const (
 	UserIDKey ctxKey = "user_id"
 	RoleKey   ctxKey = "role"
+	EmailKey  ctxKey = "email"
 )
 
 // --------------------
@@ -42,9 +44,11 @@ func Auth(next http.HandlerFunc) http.HandlerFunc {
 
 		userID := int64(claims["user_id"].(float64))
 		role := claims["role"].(string)
+		email := claims["email"].(string)
 
 		ctx := context.WithValue(r.Context(), UserIDKey, userID)
 		ctx = context.WithValue(ctx, RoleKey, role)
+		ctx = context.WithValue(ctx, EmailKey, email)
 
 		next(w, r.WithContext(ctx))
 	}
@@ -62,4 +66,19 @@ func AdminOnly(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+// --------------------
+// GET USER FROM CONTEXT
+// --------------------
+func GetUserFromContext(ctx context.Context) (int64, string, string, error) {
+	userID, ok := ctx.Value(UserIDKey).(int64)
+	if !ok {
+		return 0, "", "", errors.New("no user id")
+	}
+
+	role, _ := ctx.Value(RoleKey).(string)
+	email, _ := ctx.Value(EmailKey).(string)
+
+	return userID, role, email, nil
 }

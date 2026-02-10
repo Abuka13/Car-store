@@ -1,0 +1,19 @@
+/* client/src/styles/globals.css — ПЕРЕПИСАТЬ ПОЛНОСТЬЮ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: #f4f4f5;
+}
+/* client/src/styles/globals.css — ДОПОЛНЕНИЕ */
+
+.container {
+  @apply max-w-7xl mx-auto px-4;
+}
