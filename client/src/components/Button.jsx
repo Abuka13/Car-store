@@ -1,16 +1,12 @@
-// client/src/components/Button.jsx
-
 export default function Button({ children, variant = "primary", className = "", ...props }) {
-  const base =
-    "inline-flex items-center justify-center rounded-xl px-4 py-2 font-semibold transition";
-
-  const styles = {
-    primary: "bg-black text-white hover:bg-zinc-800",
-    ghost: "border border-zinc-200 hover:bg-zinc-100",
+  const variants = {
+    primary: "btn-gradient",
+    outline: "btn-outline",
+    danger: "bg-red-600 text-white hover:bg-red-700 font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300",
   };
 
   return (
-    <button className={`${base} ${styles[variant]} ${className}`} {...props}>
+    <button className={`${variants[variant]} ${className}`} {...props}>
       {children}
     </button>
   );

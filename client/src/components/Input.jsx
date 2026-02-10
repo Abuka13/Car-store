@@ -1,10 +1,16 @@
-// client/src/components/Input.jsx
-
-export default function Input(props) {
+export default function Input({ label, error, className = "", ...props }) {
   return (
-    <input
-      {...props}
-      className="w-full rounded-xl border border-zinc-200 px-3 py-2 outline-none focus:ring-2 focus:ring-black"
-    />
+    <div className="space-y-2">
+      {label && (
+        <label className="block text-sm font-semibold text-slate-700">
+          {label}
+        </label>
+      )}
+      <input
+        className={`input-field ${error ? "border-red-500 ring-red-500" : ""} ${className}`}
+        {...props}
+      />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
   );
 }
