@@ -22,6 +22,7 @@ var (
 type AuctionRepo interface {
 	Create(a *model.Auction) error
 	GetAll() ([]model.Auction, error)
+	GetAllWithBids() ([]model.Auction, error) // ДОБАВЛЕНО
 	Update(a *model.Auction) error
 	Delete(id int64) error
 	GetByID(id int64) (*model.Auction, error)
@@ -36,6 +37,7 @@ type BidRepo interface {
 	Create(b *model.Bid) error
 	GetMaxBidByAuctionID(auctionID int64) (*model.Bid, error)
 	UserBidsLimitInMinute(userID, auctionID int64) (int, error)
+	GetByAuctionID(auctionID int64) ([]model.Bid, error) // ДОБАВЛЕНО
 }
 
 type OrderCreator interface {
@@ -93,12 +95,37 @@ func (s *AuctionService) CreateAuction(a *model.Auction) error {
 	return s.repo.Create(a)
 }
 
+// ИЗМЕНЕНО: теперь возвращает аукционы с информацией о ставках
 func (s *AuctionService) GetAuctions() ([]model.Auction, error) {
-	return s.repo.GetAll()
+	return s.repo.GetAllWithBids()
 }
 
 func (s *AuctionService) GetAuctionByID(id int64) (*model.Auction, error) {
-	return s.repo.GetByID(id)
+	auction, err := s.repo.GetByID(id)
+	if err != nil || auction == nil {
+		return auction, err
+	}
+
+	// ДОБАВЛЕНО: получаем текущую цену и количество ставок
+	maxBid, err := s.bidRepo.GetMaxBidByAuctionID(id)
+	if err != nil {
+		return auction, err
+	}
+
+	if maxBid != nil {
+		auction.CurrentPrice = maxBid.Amount
+	} else {
+		auction.CurrentPrice = auction.StartPrice
+	}
+
+	// Получаем количество ставок
+	bids, err := s.bidRepo.GetByAuctionID(id)
+	if err != nil {
+		return auction, err
+	}
+	auction.BidCount = len(bids)
+
+	return auction, nil
 }
 
 func (s *AuctionService) UpdateAuction(a *model.Auction) error {
@@ -140,12 +167,14 @@ func (s *AuctionService) PlaceBid(auctionID, userID int64, amount float64) error
 		return err
 	}
 
-	currentPrice := 0.0
+	currentPrice := auction.StartPrice
 	if maxBid != nil {
 		currentPrice = maxBid.Amount
 	}
+
+	// ИСПРАВЛЕНО: ставка должна быть БОЛЬШЕ текущей цены
 	if amount <= currentPrice {
-		return fmt.Errorf("bid must be higher than current price")
+		return fmt.Errorf("bid must be higher than current price ($%.2f)", currentPrice)
 	}
 
 	bid := &model.Bid{

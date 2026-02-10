@@ -64,3 +64,31 @@ func (r *BidRepository) UserBidsLimitInMinute(userID, auctionID int64) (int, err
 	err := r.db.QueryRow(query, userID, auctionID).Scan(&count)
 	return count, err
 }
+
+// ДОБАВИТЬ этот метод
+func (r *BidRepository) GetByAuctionID(auctionID int64) ([]model.Bid, error) {
+	query := `
+		SELECT id, auction_id, user_id, amount, created_at
+		FROM bids
+		WHERE auction_id = $1
+		ORDER BY amount DESC
+	`
+
+	rows, err := r.db.Query(query, auctionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bids []model.Bid
+	for rows.Next() {
+		var b model.Bid
+		err := rows.Scan(&b.ID, &b.AuctionID, &b.UserID, &b.Amount, &b.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		bids = append(bids, b)
+	}
+
+	return bids, nil
+}

@@ -58,6 +58,52 @@ func (r *AuctionRepository) GetAll() ([]model.Auction, error) {
 	return auctions, nil
 }
 
+// ИСПРАВЛЕНО: возвращает []model.Auction вместо []*model.Auction
+func (r *AuctionRepository) GetAllWithBids() ([]model.Auction, error) {
+	query := `
+		SELECT 
+			a.id, 
+			a.car_id, 
+			a.start_price,
+			COALESCE(MAX(b.amount), a.start_price) as current_price,
+			COUNT(b.id) as bid_count,
+			a.start_time, 
+			a.end_time, 
+			a.created_at
+		FROM auctions a
+		LEFT JOIN bids b ON a.id = b.auction_id
+		GROUP BY a.id, a.car_id, a.start_price, a.start_time, a.end_time, a.created_at
+		ORDER BY a.created_at DESC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var auctions []model.Auction
+	for rows.Next() {
+		var a model.Auction
+		err := rows.Scan(
+			&a.ID,
+			&a.CarID,
+			&a.StartPrice,
+			&a.CurrentPrice,
+			&a.BidCount,
+			&a.StartTime,
+			&a.EndTime,
+			&a.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		auctions = append(auctions, a)
+	}
+
+	return auctions, nil
+}
+
 func (r *AuctionRepository) Update(a *model.Auction) error {
 	query := `
 		UPDATE auctions
