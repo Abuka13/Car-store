@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gavel, Clock, TrendingUp, Calendar } from 'lucide-react';
+import { Gavel, Clock, TrendingUp, Calendar, ArrowUp } from 'lucide-react';
 import { auctionsAPI, carsAPI } from '../services/api';
 import { Header } from '../components/Header';
 
@@ -11,10 +11,11 @@ export const Auctions = () => {
   const [success, setSuccess] = useState('');
   const [bidModal, setBidModal] = useState(null);
   const [bidAmount, setBidAmount] = useState('');
+  const [bidResult, setBidResult] = useState(null); // ✅ Для показа результата ставки
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000); // Refresh every 5 seconds
+    const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -62,6 +63,7 @@ export const Auctions = () => {
     return now >= start && now <= end;
   };
 
+  // ✅ ИСПРАВЛЕНО: Обработка ответа с информацией об изменении цены
   const handleBid = async () => {
     if (!bidAmount || parseFloat(bidAmount) <= 0) {
       setError('Please enter a valid bid amount');
@@ -69,12 +71,28 @@ export const Auctions = () => {
     }
 
     try {
-      await auctionsAPI.placeBid(bidModal.id, parseFloat(bidAmount));
-      setSuccess('Bid placed successfully!');
+      const response = await auctionsAPI.placeBid(bidModal.id, parseFloat(bidAmount));
+      
+      // ✅ Показываем результат ставки
+      if (response.data) {
+        setBidResult(response.data);
+        setSuccess(
+          `Bid placed! New price: $${response.data.new_price?.toLocaleString()} ` +
+          `(+$${response.data.price_increase?.toLocaleString()})`
+        );
+      } else {
+        setSuccess('Bid placed successfully!');
+      }
+      
       setBidModal(null);
       setBidAmount('');
-      loadData();
-      setTimeout(() => setSuccess(''), 3000);
+      loadData(); // Обновляем список аукционов
+      
+      // Показываем уведомление 5 секунд
+      setTimeout(() => {
+        setSuccess('');
+        setBidResult(null);
+      }, 5000);
     } catch (err) {
       setError(err.response?.data || 'Failed to place bid');
       setTimeout(() => setError(''), 3000);
@@ -108,6 +126,53 @@ export const Auctions = () => {
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
 
+        {/* ✅ Показываем детальный результат ставки */}
+        {bidResult && (
+          <div className="card" style={{ 
+            backgroundColor: 'var(--success-bg)', 
+            borderColor: 'var(--success)',
+            marginBottom: '1.5rem'
+          }}>
+            <div className="card-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <TrendingUp size={32} color="var(--success)" />
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Bid Placed Successfully!
+                  </h3>
+                  <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Your Bid: </span>
+                      <span style={{ fontWeight: '700', fontSize: '1.1rem' }}>
+                        ${bidResult.your_bid?.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>New Price: </span>
+                      <span style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--success)' }}>
+                        ${bidResult.new_price?.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Increase: </span>
+                      <span style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--accent)' }}>
+                        <ArrowUp size={16} style={{ display: 'inline', verticalAlign: 'middle' }} />
+                        ${bidResult.price_increase?.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Total Bids: </span>
+                      <span style={{ fontWeight: '700', fontSize: '1.1rem' }}>
+                        {bidResult.bid_count}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeAuctions.length === 0 ? (
           <div className="empty-state">
             <Gavel size={64} className="empty-icon" />
@@ -121,6 +186,10 @@ export const Auctions = () => {
             {activeAuctions.map(auction => {
               const car = cars[auction.car_id];
               if (!car) return null;
+
+              // ✅ Показываем текущую цену или стартовую
+              const currentPrice = auction.current_price || auction.start_price;
+              const bidCount = auction.bid_count || 0;
 
               return (
                 <div key={auction.id} className="card">
@@ -136,13 +205,29 @@ export const Auctions = () => {
                       <span style={{ color: 'var(--text-secondary)' }}>{car.year}</span>
                     </div>
 
+                    {/* ✅ ИСПРАВЛЕНО: Показываем текущую цену и стартовую */}
                     <div className="flex items-center gap-2 mb-2">
                       <TrendingUp size={16} color="var(--text-secondary)" />
                       <span style={{ color: 'var(--text-secondary)' }}>
-                        Starting Price:
+                        Current Price:
                       </span>
-                      <span style={{ fontWeight: '600' }}>
-                        ${auction.start_price?.toLocaleString()}
+                      <span style={{ fontWeight: '700', fontSize: '1.2rem', color: 'var(--accent)' }}>
+                        ${currentPrice?.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {currentPrice > auction.start_price && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <ArrowUp size={16} color="var(--success)" />
+                        <span style={{ color: 'var(--success)', fontSize: '0.9rem' }}>
+                          +${(currentPrice - auction.start_price).toLocaleString()} from start
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 mb-2">
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                        Starting Price: ${auction.start_price?.toLocaleString()}
                       </span>
                     </div>
 
@@ -156,9 +241,16 @@ export const Auctions = () => {
                       </span>
                     </div>
 
-                    <span className="badge badge-info">
-                      Active Auction
-                    </span>
+                    <div className="flex gap-2">
+                      <span className="badge badge-info">
+                        Active Auction
+                      </span>
+                      {bidCount > 0 && (
+                        <span className="badge badge-warning">
+                          {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="card-footer">
@@ -193,8 +285,13 @@ export const Auctions = () => {
                     {cars[bidModal.car_id]?.brand} {cars[bidModal.car_id]?.model}
                   </h3>
                   <p style={{ color: 'var(--text-secondary)' }}>
-                    Starting Price: ${bidModal.start_price?.toLocaleString()}
+                    Current Price: ${(bidModal.current_price || bidModal.start_price)?.toLocaleString()}
                   </p>
+                  {bidModal.bid_count > 0 && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                      {bidModal.bid_count} {bidModal.bid_count === 1 ? 'bid' : 'bids'} placed
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -205,11 +302,11 @@ export const Auctions = () => {
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
                     placeholder="Enter your bid"
-                    min={bidModal.start_price}
+                    min={(bidModal.current_price || bidModal.start_price) + 1}
                     step="0.01"
                   />
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                    Minimum bid: ${bidModal.start_price?.toLocaleString()}
+                    Minimum bid: ${((bidModal.current_price || bidModal.start_price) + 0.01)?.toLocaleString()}
                   </p>
                 </div>
               </div>

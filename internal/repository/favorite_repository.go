@@ -14,10 +14,12 @@ func NewFavoriteRepository(db *sql.DB) *FavoriteRepository {
 	return &FavoriteRepository{db: db}
 }
 
+// ✅ ИСПРАВЛЕНО: Добавлена обработка ошибок дубликата
 func (r *FavoriteRepository) Add(userID, carID int64) error {
 	_, err := r.db.Exec(`
 		INSERT INTO favorites (user_id, car_id)
 		VALUES ($1, $2)
+		ON CONFLICT (user_id, car_id) DO NOTHING
 	`, userID, carID)
 	return err
 }
@@ -41,6 +43,7 @@ func (r *FavoriteRepository) Exists(userID, carID int64) (bool, error) {
 	return exists, err
 }
 
+// ✅ ИСПРАВЛЕНО: Добавлена проверка rows.Err() и возврат пустого массива
 func (r *FavoriteRepository) GetByUser(userID int64) ([]model.Car, error) {
 	rows, err := r.db.Query(`
 		SELECT c.id, c.brand, c.model, c.year, c.price,
@@ -48,6 +51,7 @@ func (r *FavoriteRepository) GetByUser(userID int64) ([]model.Car, error) {
 		FROM cars c
 		JOIN favorites f ON f.car_id = c.id
 		WHERE f.user_id = $1
+		ORDER BY f.created_at DESC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -70,6 +74,14 @@ func (r *FavoriteRepository) GetByUser(userID int64) ([]model.Car, error) {
 			return nil, err
 		}
 		cars = append(cars, c)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if cars == nil {
+		cars = []model.Car{}
 	}
 
 	return cars, nil
