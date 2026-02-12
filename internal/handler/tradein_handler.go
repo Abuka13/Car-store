@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"car-store/internal/middleware"
 	"car-store/internal/model"
 	"car-store/internal/service"
 )
@@ -17,10 +18,12 @@ func NewTradeInHandler(service service.TradeInService) *TradeInHandler {
 	return &TradeInHandler{service: service}
 }
 
+// --------------------
 // POST /trade-ins
+// --------------------
 func (h *TradeInHandler) CreateTradeIn(w http.ResponseWriter, r *http.Request) {
-	userIDAny := r.Context().Value("userID")
-	userID, ok := userIDAny.(int64)
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok || userID == 0 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -45,16 +48,18 @@ func (h *TradeInHandler) CreateTradeIn(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// --------------------
 // GET /trade-ins?id=123
+// --------------------
 func (h *TradeInHandler) GetTradeIn(w http.ResponseWriter, r *http.Request) {
-	userIDAny := r.Context().Value("userID")
-	userID, ok := userIDAny.(int64)
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok || userID == 0 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	role, _ := r.Context().Value("role").(string)
+	role, _ := r.Context().Value(middleware.RoleKey).(string)
 	isAdmin := role == "admin"
 
 	idStr := r.URL.Query().Get("id")
@@ -81,10 +86,12 @@ func (h *TradeInHandler) GetTradeIn(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(tradeIn)
 }
 
+// --------------------
 // GET /trade-ins/my
+// --------------------
 func (h *TradeInHandler) GetUserTradeIns(w http.ResponseWriter, r *http.Request) {
-	userIDAny := r.Context().Value("userID")
-	userID, ok := userIDAny.(int64)
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok || userID == 0 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -99,8 +106,11 @@ func (h *TradeInHandler) GetUserTradeIns(w http.ResponseWriter, r *http.Request)
 	_ = json.NewEncoder(w).Encode(tradeIns)
 }
 
-// GET /admin/trade-ins?status=pending
+// --------------------
+// ADMIN: GET /admin/trade-ins
+// --------------------
 func (h *TradeInHandler) GetAllTradeIns(w http.ResponseWriter, r *http.Request) {
+
 	status := r.URL.Query().Get("status")
 
 	tradeIns, err := h.service.GetAllTradeIns(r.Context(), status)
@@ -112,8 +122,11 @@ func (h *TradeInHandler) GetAllTradeIns(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(tradeIns)
 }
 
-// POST /admin/trade-ins/evaluate?id=123
+// --------------------
+// ADMIN: POST /admin/trade-ins/evaluate?id=123
+// --------------------
 func (h *TradeInHandler) EvaluateTradeIn(w http.ResponseWriter, r *http.Request) {
+
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -135,15 +148,17 @@ func (h *TradeInHandler) EvaluateTradeIn(w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(model.TradeInResponse{
-		Message: "Trade-in evaluated successfully. User can now set payment amount.",
+		Message: "Trade-in evaluated successfully",
 		TradeIn: tradeIn,
 	})
 }
 
+// --------------------
 // POST /trade-ins/set-payment?id=123
+// --------------------
 func (h *TradeInHandler) SetUserPayment(w http.ResponseWriter, r *http.Request) {
-	userIDAny := r.Context().Value("userID")
-	userID, ok := userIDAny.(int64)
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok || userID == 0 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -174,15 +189,17 @@ func (h *TradeInHandler) SetUserPayment(w http.ResponseWriter, r *http.Request) 
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(model.TradeInResponse{
-		Message:         "Payment set successfully. You can now browse cars in your budget on kolesa.kz",
+		Message:         "Payment set successfully",
 		KolesaSearchURL: kolesaURL,
 	})
 }
 
+// --------------------
 // POST /trade-ins/reject?id=123
+// --------------------
 func (h *TradeInHandler) RejectTradeIn(w http.ResponseWriter, r *http.Request) {
-	userIDAny := r.Context().Value("userID")
-	userID, ok := userIDAny.(int64)
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok || userID == 0 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -207,21 +224,23 @@ func (h *TradeInHandler) RejectTradeIn(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(model.TradeInResponse{
-		Message: "Trade-in offer rejected",
+		Message: "Trade-in rejected",
 		TradeIn: tradeIn,
 	})
 }
 
+// --------------------
 // DELETE /trade-ins?id=123
+// --------------------
 func (h *TradeInHandler) DeleteTradeIn(w http.ResponseWriter, r *http.Request) {
-	userIDAny := r.Context().Value("userID")
-	userID, ok := userIDAny.(int64)
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int64)
 	if !ok || userID == 0 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	role, _ := r.Context().Value("role").(string)
+	role, _ := r.Context().Value(middleware.RoleKey).(string)
 	isAdmin := role == "admin"
 
 	idStr := r.URL.Query().Get("id")

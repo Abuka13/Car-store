@@ -77,4 +77,42 @@ CREATE TABLE favorites (
                                    ON DELETE CASCADE
 );
 
+CREATE TABLE tradeins (
+                          id BIGSERIAL PRIMARY KEY,
+
+                          user_id BIGINT NOT NULL,
+                          offered_brand TEXT NOT NULL,
+                          offered_model TEXT NOT NULL,
+                          year INT NOT NULL,
+                          mileage INT NOT NULL,
+
+                          desired_car_id BIGINT NOT NULL,
+
+                          estimated_price NUMERIC,
+                          user_payment NUMERIC,
+
+                          status TEXT NOT NULL DEFAULT 'pending',
+
+                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- --------------------
+    -- FOREIGN KEYS
+    -- --------------------
+                          CONSTRAINT fk_tradeins_user
+                              FOREIGN KEY (user_id)
+                                  REFERENCES users(id)
+                                  ON DELETE CASCADE,
+
+                          CONSTRAINT fk_tradeins_desired_car
+                              FOREIGN KEY (desired_car_id)
+                                  REFERENCES cars(id)
+                                  ON DELETE CASCADE,
+
+    -- --------------------
+    -- CHECK CONSTRAINTS
+    -- --------------------
+                          CONSTRAINT chk_tradeins_status
+                              CHECK (status IN ('pending', 'evaluated', 'accepted', 'rejected'))
+);
+
 
