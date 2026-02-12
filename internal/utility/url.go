@@ -20,13 +20,8 @@ func GenerateKolesaURLFromPayment(estimatedPrice, userPayment float64) string {
 	// Базовый URL kolesa.kz
 	baseURL := "https://kolesa.kz/cars/"
 
-	// Добавляем параметры цены
-	params := url.Values{}
-	params.Add("price[from]", fmt.Sprintf("%d", minPriceKZT))
-	params.Add("price[to]", fmt.Sprintf("%d", maxPriceKZT))
-
 	// Формируем финальный URL
-	finalURL := baseURL + "?" + params.Encode()
+	finalURL := fmt.Sprintf("https://kolesa.kz/cars/?price[from]=%d&price[to]=%d", minPriceKZT, maxPriceKZT)
 
 	return finalURL
 }
