@@ -187,8 +187,7 @@ func (h *TradeInHandler) SetUserPayment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(model.TradeInResponse{
+	writeJSON(w, http.StatusOK, model.TradeInResponse{
 		Message:         "Payment set successfully",
 		KolesaSearchURL: kolesaURL,
 	})
@@ -264,4 +263,12 @@ func (h *TradeInHandler) DeleteTradeIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(payload)
 }

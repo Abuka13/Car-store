@@ -2,7 +2,7 @@ package utility
 
 import (
 	"fmt"
-	"net/url"
+	_ "net/url"
 )
 
 func GenerateKolesaURLFromPayment(estimatedPrice, userPayment float64) string {
@@ -16,9 +16,6 @@ func GenerateKolesaURLFromPayment(estimatedPrice, userPayment float64) string {
 	// Конвертируем в тенге (1 USD ≈ 450 KZT)
 	minPriceKZT := minPrice * 450
 	maxPriceKZT := maxPrice * 450
-
-	// Базовый URL kolesa.kz
-	baseURL := "https://kolesa.kz/cars/"
 
 	// Формируем финальный URL
 	finalURL := fmt.Sprintf("https://kolesa.kz/cars/?price[from]=%d&price[to]=%d", minPriceKZT, maxPriceKZT)
