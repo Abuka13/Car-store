@@ -33,10 +33,12 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	orderRepo := repository.NewOrderRepository(db)
 	favoriteRepo := repository.NewFavoriteRepository(db)
+	tradeInRepo := repository.NewTradeInRepository(db)
 
 	// --------------------
 	// SERVICES
 	// --------------------
+	tradeInService := service.NewTradeInService(tradeInRepo)
 	carService := service.NewCarService(carRepo)
 
 	orderService := service.NewOrderService(orderRepo, carRepo)
@@ -60,6 +62,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	orderHandler := handler.NewOrderHandler(orderService)
 	favoriteHandler := handler.NewFavoriteHandler(favoriteService)
+	tradeInHandler := handler.NewTradeInHandler(tradeInService)
 
 	// --------------------
 	// AUTH (PUBLIC)
@@ -95,6 +98,90 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	// --------------------
+	// TRADE-IN ROUTES
+	// --------------------
+
+	// /trade-ins
+	// POST  -> CreateTradeIn
+	// GET   -> GetTradeIn (через ?id=123)
+	// DELETE-> DeleteTradeIn (через ?id=123)
+	http.HandleFunc("/trade-ins", middleware.Auth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			tradeInHandler.CreateTradeIn(w, r)
+		case http.MethodGet:
+			tradeInHandler.GetTradeIn(w, r)
+		case http.MethodDelete:
+			tradeInHandler.DeleteTradeIn(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// /trade-ins/my
+	// GET -> GetUserTradeIns
+	http.HandleFunc("/trade-ins/my", middleware.Auth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			tradeInHandler.GetUserTradeIns(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// /trade-ins/set-payment?id=123
+	// POST -> SetUserPayment
+	http.HandleFunc("/trade-ins/set-payment", middleware.Auth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			tradeInHandler.SetUserPayment(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// /trade-ins/reject?id=123
+	// POST -> RejectTradeIn
+	http.HandleFunc("/trade-ins/reject", middleware.Auth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			tradeInHandler.RejectTradeIn(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// --------------------
+	// ADMIN TRADE-IN ROUTES
+	// --------------------
+
+	// /admin/trade-ins?status=pending
+	// GET -> GetAllTradeIns
+	http.HandleFunc("/admin/trade-ins", middleware.Auth(
+		middleware.AdminOnly(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet:
+				tradeInHandler.GetAllTradeIns(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+		}),
+	))
+
+	// /admin/trade-ins/evaluate?id=123
+	// POST -> EvaluateTradeIn
+	http.HandleFunc("/admin/trade-ins/evaluate", middleware.Auth(
+		middleware.AdminOnly(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodPost:
+				tradeInHandler.EvaluateTradeIn(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+		}),
+	))
 
 	// --------------------
 	// AUCTIONS
